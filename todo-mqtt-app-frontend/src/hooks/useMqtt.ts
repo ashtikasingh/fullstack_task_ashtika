@@ -1,12 +1,24 @@
-import { useEffect } from 'react';
-import mqtt from 'mqtt';
+import { useEffect, useRef } from 'react';
+import mqtt, { MqttClient } from 'mqtt';
 
 export const useMqtt = () => {
-    const client = mqtt.connect('ws://test.mosquitto.org:8080');
+    const clientRef = useRef<MqttClient | null>(null);
 
     useEffect(() => {
+        const client = mqtt.connect('ws://test.mosquitto.org:8080');
+        clientRef.current = client;
+
         client.on('connect', () => {
             console.log('MQTT connected');
+        });
+
+        client.on('error', (err) => {
+            console.error('MQTT error:', err);
+            client.end();
+        });
+
+        client.on('close', () => {
+            console.log('MQTT disconnected');
         });
 
         return () => {
@@ -15,7 +27,11 @@ export const useMqtt = () => {
     }, []);
 
     const publishNote = (note: string) => {
-        client.publish('/add', note);
+        if (clientRef.current && clientRef.current.connected) {
+            clientRef.current.publish('/add', note);
+        } else {
+            console.warn('MQTT client not connected');
+        }
     };
 
     return { publishNote };
